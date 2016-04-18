@@ -1,12 +1,8 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: stuart
- * Date: 15/04/2016
- * Time: 16:25
- */
 
 namespace Bryter\Helpers\Config;
+
+use Illuminate\Support\Facades\Log;
 
 
 /**
@@ -24,7 +20,12 @@ class Config
     /**
      * @var string
      */
-    public $path;
+    public $storageDir;
+
+    /**
+     * @var string
+     */
+    public $filename = 'config.json';
 
     /**
      * __construct
@@ -32,11 +33,11 @@ class Config
      * @param $path
      * @param array $data
      */
-    function __construct($path, $data = array())
+    function __construct($storageDir = null, $data = array())
     {
-        $this->path = $path;
+        if (!is_null($storageDir)) $this->storageDir = $storageDir;
 
-        if (!count($data)) $this->loadConfigData($path);
+        if (!count($data)) $this->loadConfigData($storageDir);
         else $this->data = $data;
     }
 
@@ -48,11 +49,10 @@ class Config
      * @param $default
      * @return mixed
      */
-    public function get($key, $default) {
+    public function get($key, $default = false) {
 
         if (array_key_exists($key, $this->data))
             return $this->data[$key];
-        else $this->set($key, $default);
 
         return $default;
     }
@@ -76,14 +76,16 @@ class Config
      *
      * @param null $path
      */
-    public function save($path = null) {
-        if (is_null($path)) $path = $this->path;
+    public function save($storageDir = null) {
+        if (is_null($storageDir)) $storageDir = $this->storageDir;
+
+        $fullPath = $this->getFullpath($storageDir);
 
         try {
-            file_put_contents($path, json_encode($this->data));
+            file_put_contents($fullPath, json_encode($this->data));
             return true;
         } catch(\ErrorException $error) {
-            Log::error('Config file write failed: ' . $path);
+            Log::error('Config file write failed: ' . $fullPath);
             return false;
         }
     }
@@ -94,10 +96,10 @@ class Config
      * @param null $path
      * @return array
      */
-    public function refresh($path = null) {
-        if (is_null($path)) $path = $this->path;
+    public function refresh($storageDir = null) {
+        if (is_null($storageDir)) $storageDir = $this->storageDir;
 
-        return $this->loadConfigData($path);
+        return $this->loadConfigData($storageDir);
     }
 
     /**
@@ -124,14 +126,16 @@ class Config
      * @param null $path
      * @return array
      */
-    public function loadConfigData($path = null) {
-        if (is_null($path)) $path = $this->path;
+    public function loadConfigData($storageDir = null) {
+        if (is_null($storageDir)) $storageDir = $this->storageDir;
+
+        $fullPath = $this->getFullpath($storageDir);
 
         $dataArray = array();
 
-        if (is_file($path)) {
+        if (is_file($fullPath)) {
             $dataArray = json_decode(
-                file_get_contents($path)
+                file_get_contents($fullPath)
             );
         }
 
@@ -145,11 +149,14 @@ class Config
      * @param $key
      * @return bool
      */
-    public static function has($path, $key) {
+    public function has($key, $storageDir = null) {
+        if (is_null($storageDir)) $storageDir = $this->storageDir;
 
-        if (self::hasConfig($path)) {
+        $fullPath = $this->getFullpath($storageDir);
+
+        if (self::hasConfig($storageDir)) {
             $dataArray = (array) json_decode(
-                file_get_contents($path)
+                file_get_contents($fullPath)
             );
 
             return array_key_exists($key, $dataArray);
@@ -160,9 +167,77 @@ class Config
      * @param $path
      * @return bool
      */
-    public static function hasConfig($path) {
-        if (is_file($path)) return true;
+    public function hasConfig($storageDir = null) {
+        if (is_null($storageDir)) $storageDir = $this->storageDir;
+
+        $fullPath = $this->getFullpath($storageDir);
+
+        if (is_file($fullPath)) return true;
         else return false;
     }
+
+    public function getStorageDir() {
+        return $this->storageDir;
+    }
+
+    public function setStorageDir($storageDir) {
+        $this->storageDir = $storageDir;
+    }
+
+    /**
+     * @return string
+     */
+    public function getFilename()
+    {
+        return $this->filename;
+    }
+
+    /**
+     * @param string $filename
+     */
+    public function setFilename($filename)
+    {
+        $this->filename = $filename;
+    }
+
+    public function getFullpath($storageDir = null) {
+        if (is_null($storageDir)) $storageDir = $this->storageDir;
+
+        $fullPath = $storageDir . DIRECTORY_SEPARATOR . $this->getFilename();
+
+        return $fullPath;
+    }
+
+    /**
+     * @param $storageDir
+     * @return mixed
+     */
+    public function hasStorageDir($storageDir = null) {
+
+        if (is_null($storageDir)) $storageDir = $this->storageDir;
+
+        return is_dir(
+            $storageDir
+        );
+    }
+
+    /**
+     * @param $username
+     * @return mixed
+     */
+    public function createStorageDir($storageDir = null) {
+
+        if (is_null($storageDir)) $storageDir = $this->storageDir;
+
+        if (!$this->hasStorageDir($storageDir) ) mkdir(
+            $storageDir,
+            '0755',
+            true
+        );
+
+        return $this->hasStorageDir($storageDir);
+    }
+
+
 
 }
